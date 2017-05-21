@@ -1,14 +1,33 @@
 """
-TODO
+Variation operators for genetic algorithms.
 """
 from abc import ABCMeta, abstractmethod
 import random
 
-from .population import FUNCS, ERC_GENERATORS, generate_random_code, Individual, Population
+from .population import (FUNCS, ERC_GENERATORS, generate_random_code,
+                         Individual, Population)
 from .utils import get_arity, noise_factor
 
 class VariationOperator(metaclass=ABCMeta):
-    """TODO: Write docstring
+    """Variation operator base class. All variation operators must inherit from
+    this class.
+
+    Properties
+    ----------
+    operator_type : str
+        Denotes the type of VariationOperator. Supported options are 'mutation',
+        'recombination', 'pipeline', and 'clone'.
+
+        Mutation operators require a single Individual and a function set to be
+        performed.
+
+        Recombination operators require two Individuals and no function set.
+
+        Pipeline operators can be comprised of many other VariationOperators
+        chained together and thus require two Individuals and a function set to
+        be performed.
+
+        Clone operators only require a single Individual.
     """
 
     _operator_type = None
@@ -19,7 +38,7 @@ class VariationOperator(metaclass=ABCMeta):
 
     @operator_type.setter
     def operator_type(self, value):
-        if value not in ('mutation', 'recombination'):
+        if value not in ('mutation', 'recombination', ):
             raise AttributeError('Unknown variation operator type' + str(value))
         self._operator_type = value
 
@@ -28,16 +47,27 @@ class VariationOperator(metaclass=ABCMeta):
         del self._operator_type
 
     @abstractmethod
-    def produce(self, individual_1, individual_2):
+    def produce(self):
         """Produces a child.
-
-        :param list individual1: Individual of parent 1.
-        :param list individual2: Individual of parent 2.
-        :returns: A new Individual created by alternating between parent programs.
         """
 
 class UniformMutator(VariationOperator):
-    """TODO: Write docstring
+    """Uniform Mutation operator.
+
+    Parameters
+    ----------
+    rate : float
+        The probablility of mutating any given element of the individual's
+        program. Must be 0 <= rate <= 1. Defaults to 0.1.
+
+    constant_perturb_rate : float
+        When mutating a constant value, this is the probably of the value being
+        perturbed with Gaussian noise, rather than than replaced with an
+        entirely new function name or constant. Defaults to 0.5.
+
+    perturb_standard_deviation : float
+        When constant value is being perturbed with Gaussian noise, this is used
+        as the standard deviation of the noise. Defaults to 1.0.
     """
 
     def __init__(self, rate=0.1, constant_perturb_rate=0.5,
@@ -47,11 +77,30 @@ class UniformMutator(VariationOperator):
         self.perturb_standard_deviation = perturb_standard_deviation
         self.operator_type = 'mutation'
 
-    def produce(self, individual_1, individual_2=None, function_set=None):
-        """TODO: Write docstring
+    def produce(self, individual, function_set):
+        """Produces a child using Umiform Mutation.
+
+        FIXME: Mutation ERC_GENERATORS cannot currently be set.
+
+        Parameters
+        ----------
+        individual : Individual
+            Individual whose program will be uniformly mutated to produce a
+            child Individual.
+
+        function_set : list[]
+            List of function names (strings) to use when mutation overwrites
+            code in an individual's program with new code. This should included
+            supported function names and input_n where n is the index of a
+            feature.
+
+        Returns
+        -------
+        child : Individual
+            A new individual.
         """
         new_prog = []
-        for el in individual_1.program[:]:
+        for el in individual.program[:]:
             if random.random() > self.rate:
                 new_prog.append(el)
             else:
@@ -73,6 +122,16 @@ class Alternator(VariationOperator):
 
     More information can be found on the `this Push-Redux page
     <https://erp12.github.io/push-redux/pages/genetic_operators/index.html#recombination>`_.
+
+    Parameters
+    ----------
+    rate : float
+        The probablility of switching which parent program elements are being
+        copied from. Must be 0 <= rate <= 1. Defaults to 0.1.
+
+    alignment_deviation : int
+        When switching between parent programs, this value denotes ...
+        FIXME: Look up exact definition in Clojush.
     """
 
     def __init__(self, rate=0.1, alignment_deviation=10):
@@ -83,9 +142,20 @@ class Alternator(VariationOperator):
     def produce(self, individual1, individual2):
         """Produces a child using the alternation operator.
 
-        :param list individual1: Individual of parent 1.
-        :param list individual2: Individual of parent 2.
-        :returns: A new Individual created by alternating between parent programs.
+        Parameters
+        ----------
+        individual1 : Individual
+            The first Individual whose program will be used during alternation
+            to produce a child program.
+
+        individual2 : Individual
+            The second Individual whose program will be used during alternation
+            to produce a child program.
+
+        Returns
+        -------
+        child : Individual
+            A new individual.
         """
         parent_1 = individual1.program
         parent_2 = individual2.program

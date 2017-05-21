@@ -1,19 +1,27 @@
 """
-TODO: Write modeule docstring
+Classes that reperesents Individuals and Populations in evolutionary algorithms.
+
+FIXME: This module uses global variables. This should be avoided if possible.
 """
 import math, random
 from copy import copy
 import numpy as np
 
 from sklearn.metrics import mean_squared_error
+from sklearn.utils.validation import _is_arraylike
 
-from .utils import get_arity, keep_number_reasonable
+from .utils import (get_arity, keep_number_reasonable,
+                    median_absolute_deviation)
 
 ####################
 # Global Variables #
 ####################
 
-# Stack Based Programs
+#: Dict of all supported functions. Key is a string denoting the name of each
+#: function. Key is the function implemented in a 'safe' way. In this context,
+#: safe means that no domain errors or overflow errors will be raised and no
+#: infinities will be produced as long as the arguements are within a reasonable
+#: range.
 FUNCS = {
     '+' : lambda x,y: y + x,
     '-' : lambda x,y: y - x,
@@ -27,9 +35,12 @@ FUNCS = {
     #'log_b' : lambda x, y: None if x <= 0 or y <= 0 else math.log(y, x),
     'sin' : lambda x: math.sin(x),
     'cos' : lambda x: math.cos(x),
-    'abs' : lambda x: abs(x)
+    'abs' : lambda x: abs(x),
+    'invrt' : lambda x: x * -1
 }
 
+#: A list of functions that take no arguments and produce ephemeral random
+#: constants when called.
 ERC_GENERATORS = [
     random.random,
     lambda : random.randint(-10, 10)
@@ -40,8 +51,38 @@ ERC_GENERATORS = [
 ####################
 
 def generate_random_code(max_size, min_size=0, function_set=list(FUNCS.keys()),
-    func_constant_ratio=0.7, erc_generators=ERC_GENERATORS):
-    """TODO: Write docstring
+    erc_generators=ERC_GENERATORS, func_constant_ratio=0.7):
+    """Generates a random list of strings (represtenting functions) and floating
+    constants that can be executed as a program.
+
+    Parameters
+    ----------
+    max_size : int
+        Maximum number of elements in the program.
+
+    min_size : int
+        Minimum number of elements in the program. Default 0.
+
+    function_set : list[str]
+        List of strings denoting which functions that could potentially be
+        included in the generated program. Each string in the list must exist as
+        a the key to one of the key-value pairs in FUNCS. Corisponding value
+        must be a function that expects an arbirary number of floats as args (or
+        no arguments). Defaults to all supported functions.
+
+    erc_generators : list[func]
+        List of funtions that produce ephemeral random constants. Ephemeral
+        random constants are randomly generated constants that are set at the
+        time of code generation. Default erc_generators include 2 functions: 1)
+        a function that produces a float, f, such that 0 <= f < 1 and 2) a
+        function that produces an integer, i, such that 0 <= i < 10.
+
+    func_constant_ratio : float
+        Floating point value such that 0 <= func_constant_ratio <= 0. Ratio of
+        functions to constants to appear in the randomly generated program.
+        A value of 0 produces a program of entirely constant values. A value of
+        1 produces a program of entirely functions, with no constants. Defaults
+        to 0.7.
     """
     size = random.randint(min_size, max_size)
     prog = []
@@ -58,14 +99,30 @@ def generate_random_code(max_size, min_size=0, function_set=list(FUNCS.keys()),
 ###########
 
 class Individual:
-    """TODO: Write docstring
+    """Individual used in Population.
+
+    Parameters
+    ----------
+    program : list
+        List of function names and float constants that can be executed as a
+        program.
     """
 
     def __init__(self, program):
         self.program = program
 
     def run_program(self, inputs=None, print_trace=False):
-        """TODO: Write docstring
+        """Individual used in Population.
+
+        Parameters
+        ----------
+        inputs : array-like, shape = (n_features,)
+            List of values for each feature that can be accessed by the input_n
+            functions found in the program.
+
+        print_trace : bool
+            If true, prints the current program element and the state of the
+            stack at each step of executing the program. Defaults to False.
         """
         if print_trace:
             print('Begin Program Execuation')
@@ -106,9 +163,19 @@ class Individual:
         return stack.pop()
 
     def evaluate(self, X, y, metric=mean_squared_error):
-        """TODO: Write Docstring
-        TODO: Check X is 2D.
-        TODO: Warn that only regression metrics work.
+        """Evaluates the individual.
+
+        Parameters
+        ----------
+        X : {array-like, sparse matrix}, shape = (n_samples, n_features)
+            Samples.
+
+        y : {array-like, sparse matrix}, shape = (n_samples, 1)
+            Labels.
+
+        metric : function
+            Function to used to calculate the error of the individual. All
+            sklearn regression metrics are supported.
         """
         y_hat = []
         error_vec = []
@@ -126,18 +193,35 @@ class Individual:
         self.total_error = metric(y, y_hat)
 
     def simplify(self, X, y, metric=mean_squared_error, steps=500):
-        """TODO: Write docstring.
-        TODO: Check evaluated.
+        """Simplifies the individual's program by randomly removing some
+        elements of the program and confirming that the total error remains the
+        same or lower.
+
+        Parameters
+        ----------
+        X : {array-like, sparse matrix}, shape = (n_samples, n_features)
+            Samples.
+
+        y : {array-like, sparse matrix}, shape = (n_samples, 1)
+            Target values.
+
+        metric : function
+            Function to used to calculate the error of an individual. All
+            sklearn regression metrics are supported.
+
+        steps : int
+            Number of simplification iterations to perform.
         """
         for step in range(steps):
             # Record the origional error and program
             original_error = copy(self.total_error)
             original_prog = self.program[:]
             # Pick random element from program to remove.
-            rm_ind = random.randint(0, len(self.program))
-            new_program = self.program[:rm_ind] + self.program[rm_ind+1:]
+            num_rm = random.randint(1, 3)
+            for i in range(num_rm):
+                rm_ind = random.randint(0, len(self.program)-1)
+                del self.program[rm_ind]
             # Evaluate the new program.
-            self.program = new_program
             self.evaluate(X, y, metric)
             # If program performance gets worse, put back the old program.
             if self.total_error > original_error:
@@ -148,11 +232,25 @@ class Individual:
         return '<Individual: ' + str(self.program) + '>'
 
 class Population(list):
-    """TODO: Write docstring
+    """
+    Symbolic regression population.
     """
 
     def evaluate(self, X, y, metric=mean_squared_error):
-        """TODO: Write docstring
+        """Evaluates every individual in the population, if the individual has
+        not been previously evaluated.
+
+        Parameters
+        ----------
+        X : {array-like, sparse matrix}, shape = (n_samples, n_features)
+            Samples.
+
+        y : {array-like, sparse matrix}, shape = (n_samples, 1)
+            Target values.
+
+        metric : function
+            Function to used to calculate the error of an individual. All
+            sklearn regression metrics are supported.
         """
         for i in self:
             if not hasattr(i, 'error_vector'):
@@ -164,7 +262,10 @@ class Population(list):
 
         http://faculty.hampshire.edu/lspector/pubs/lexicase-IEEE-TEC.pdf
 
-        :returns: A selected individual.
+        Returns
+        -------
+        individual : Individual
+            An individual from the population selected using lexicase selection.
         """
         candidates = self[:]
         cases = list(range(len(self[0].error_vector)))
@@ -175,42 +276,62 @@ class Population(list):
             cases.pop(0)
         return random.choice(candidates)
 
-    def epsilon_lexicase_selection(self, epsilon=None):
-            """Returns an individual that does the best on the fitness cases when
-            considered one at a time in random order. Requires a epsilon parameter.
+    def epsilon_lexicase_selection(self, epsilon='auto'):
+            """Returns an individual that does the best on the fitness cases
+            when considered one at a time in random order.
 
             https://push-language.hampshire.edu/uploads/default/original/1X/35c30e47ef6323a0a949402914453f277fb1b5b0.pdf
 
-            .. todo::
-                Adjust this implementation based on recent finding with epsilon lexicase
-                (ie. static, dynamic, super-dynamic, etc)
+            Parameters
+            ----------
+            epsilon : {'auto', float, array-like}
+                If an individual is within epsilon of being elite, it will
+                remain in the selection pool. If 'auto', epsilon is set at
+                the start of each selection even to be equal to the
+                Median Absolute Deviation of each test case.
 
-            :param float epsilon: If an individual is within epsilon of being elite, it will \
-            remain in the selection pool. If 'dynamic', epsilon is set at the start of \
-            each selection even. If 'super-dynamic', epsilon is set realtive to the \
-            current selection pool at each iteration of lexicase selection.
-            :returns: A list of selected individuals.
+            Returns
+            -------
+            individual : Individual
+                An individual from the population selected using lexicase
+                selection.
             """
             candidates = self[:]
             cases = list(range(len(self[0].error_vector)))
             random.shuffle(cases)
+
+            if epsilon == 'auto':
+                all_errors = np.array([i.error_vector[:] for i in candidates])
+                epsilon = np.apply_along_axis(median_absolute_deviation, 0,
+                                              all_errors)
+
             while len(cases) > 0 and len(candidates) > 1:
-                errors_for_this_case = [ind.error_vector[cases[0]] for ind in candidates]
-                best_val_for_case = min(errors_for_this_case)
-                if epsilon == None:
-                    median_val = np.median(errors_for_this_case)
-                    median_absolute_deviation = np.median([abs(x - median_val) for x in errors_for_this_case])
-                    epsilon = median_absolute_deviation
-                candidates = [ind for ind in candidates if ind.error_vector[cases[0]] <= best_val_for_case + epsilon]
+                case = cases[0]
+                errors_this_case = [i.error_vector[case] for i in candidates]
+                best_val_for_case = min(errors_this_case)
+                if _is_arraylike(epsilon):
+                    max_error = best_val_for_case + epsilon[case]
+                else:
+                    max_error = best_val_for_case + epsilon
+                test = lambda i: i.error_vector[case] <= max_error
+                candidates = [i for i in candidates if test(i)]
                 cases.pop(0)
             return random.choice(candidates)
 
     def tournament_selection(self, tournament_size=7):
-        """Returns k individuals that do the best out of their respective
+        """Returns the individual with the lowest error within a random
         tournament.
 
-        :param int tournament_size: Size of each tournament.
-        :returns: A list of selected individuals.
+        Parameters
+        ----------
+        tournament_size : int
+            Size of each tournament.
+
+        Returns
+        -------
+        individual : Individual
+            An individual from the population selected using tournament
+            selection.
         """
         tournament = []
         for _ in range(tournament_size):
@@ -219,9 +340,19 @@ class Population(list):
         best_in_tourn = [ind for ind in tournament if ind.total_error == min_error_in_tourn]
         return best_in_tourn[0]
 
-    def select(self, method='epsilon_lexicase', epsilon=None,
+    def select(self, method='epsilon_lexicase', epsilon='auto',
         tournament_size=7):
-        """TODO: Write Docstring
+        """Selects a individual from
+
+        Parameters
+        ----------
+        method : {array-like, sparse matrix}, shape = (n_samples, n_features)
+            Samples.
+
+        y : {array-like, sparse matrix}, shape = (n_samples, 1)
+            Labels.
+
+
         """
         if method == 'epsilon_lexicase':
             return self.epsilon_lexicase_selection(epsilon)
@@ -231,6 +362,24 @@ class Population(list):
             return self.tournament_selection(tournament_selection)
         else:
             raise ValueError("Unknown selection method: " + str(method))
+
+    def lowest_error(self):
+        """Returns the lowest total error found in the population.
+        """
+        gnrtr = (ind.total_error for ind in self)
+        return np.min(np.fromiter(gnrtr, np.float))
+
+    def average_error(self):
+        """Returns the average total error found in the population.
+        """
+        gnrtr = (ind.total_error for ind in self)
+        return np.mean(np.fromiter(gnrtr, np.float))
+
+    def unique(self):
+        """Returns the number of unique programs found in the population.
+        """
+        programs_set = {str(ind.program[:]) for ind in self}
+        return len(programs_set)
 
 # pop = Population()
 # for i in range(10):

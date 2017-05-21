@@ -7,14 +7,11 @@ from ..base import SymbolicRegressor
 
 X_train = np.arange(-2.0, 2.0, 0.1).reshape(-1, 1)
 
-
 def target_func(a): return (a ** 6) + (2 * a**4) + (a**2)
-
 
 Y_train = []
 for r in X_train:
     Y_train.append(target_func(*r))
-Y_train = np.reshape(Y_train, (-1, 1))
 
 print(X_train)
 print(Y_train)
