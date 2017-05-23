@@ -120,9 +120,6 @@ class UniformMutator(VariationOperator):
 class Alternator(VariationOperator):
     """Uniformly alternates between the two parents.
 
-    More information can be found on the `this Push-Redux page
-    <https://erp12.github.io/push-redux/pages/genetic_operators/index.html#recombination>`_.
-
     Parameters
     ----------
     rate : float
@@ -130,8 +127,8 @@ class Alternator(VariationOperator):
         copied from. Must be 0 <= rate <= 1. Defaults to 0.1.
 
     alignment_deviation : int
-        When switching between parent programs, this value denotes ...
-        FIXME: Look up exact definition in Clojush.
+        The standard deviation of how far alternation may jump between indices
+        when switching between parents.
     """
 
     def __init__(self, rate=0.1, alignment_deviation=10):
