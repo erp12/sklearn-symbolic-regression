@@ -36,9 +36,6 @@ print(X_test.shape)
 Y_hat = symbReg.predict(X_test)
 Y_true = np.apply_along_axis(target_func, 1, X_test)
 
-print(Y_hat.shape)
-print(Y_true.shape)
-
 #
 # Plotting
 #
@@ -53,30 +50,3 @@ ax.scatter(X_test[:,0], X_test[:,1], Y_true, linewidth=0, c='blue',
                 antialiased=False, alpha=0.5)
 
 plt.show()
-
-# x_min, x_max = X_train.min() - .1, X_train.max() + .1
-# y_min, y_max = min(Y_train) - .1, max(Y_train) + .1
-#
-# fig = plt.figure(1)
-#
-# plt.subplot(2, 1, 1)
-# plt.scatter(X_train[:, 0], Y_train,  color='black')
-# plt.scatter(X_train[:, 0], preds, color='blue')
-#
-# plt.xlabel('X1')
-# plt.ylabel('Y')
-#
-# plt.xlim(x_min, x_max)
-# plt.ylim(y_min, y_max)
-#
-# plt.subplot(2, 1, 2)
-# plt.scatter(X_train[:, 1], Y_train,  color='black')
-# plt.scatter(X_train[:, 1], preds, color='blue')
-#
-# plt.xlabel('X2')
-# plt.ylabel('Y')
-#
-# plt.xlim(x_min, x_max)
-# plt.ylim(y_min, y_max)
-#
-# plt.show()

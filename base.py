@@ -15,15 +15,16 @@ from sklearn.utils import validation, check_array
 
 from .population import (FUNCS, ERC_GENERATORS, generate_random_code,
                          Individual, Population)
-from .variation import UniformMutator, Alternator
+from .variation import UniformMutator, Alternator, OperatorPipeline
 
 ##############
 # Estimators #
 ##############
 
 DEFAULT_OPERATORS = [
-    (UniformMutator(), 0.3),
-    (Alternator(), 0.7)
+    (UniformMutator(), 0.2),
+    (Alternator(), 0.7),
+    (OperatorPipeline((UniformMutator(), Alternator())), 0.1)
 ]
 
 
@@ -109,7 +110,7 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
         overall training error of the SymbolicRegressor.
     """
 
-    def __init__(self, population_size=100, generations=200,
+    def __init__(self, population_size=200, generations=200,
                  selection_method='epsilon_lexicase',
                  max_initial_program_size=50, max_program_size=300,
                  epsilon='auto', tournament_size=7,

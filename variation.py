@@ -16,7 +16,7 @@ class VariationOperator(metaclass=ABCMeta):
     ----------
     operator_type : str
         Denotes the type of VariationOperator. Supported options are 'mutation',
-        'recombination', 'pipeline', and 'clone'.
+        'recombination', and 'pipeline'.
 
         Mutation operators require a single Individual and a function set to be
         performed.
@@ -38,7 +38,7 @@ class VariationOperator(metaclass=ABCMeta):
 
     @operator_type.setter
     def operator_type(self, value):
-        if value not in ('mutation', 'recombination', ):
+        if value not in ('mutation', 'recombination', 'pipeline', 'clone'):
             raise AttributeError('Unknown variation operator type' + str(value))
         self._operator_type = value
 
@@ -70,7 +70,7 @@ class UniformMutator(VariationOperator):
         as the standard deviation of the noise. Defaults to 1.0.
     """
 
-    def __init__(self, rate=0.1, constant_perturb_rate=0.5,
+    def __init__(self, rate=0.05, constant_perturb_rate=0.5,
         perturb_standard_deviation=1.0):
         self.rate = rate
         self.constant_perturb_rate = constant_perturb_rate
@@ -190,5 +190,45 @@ class Alternator(VariationOperator):
                         str(self.alignment_deviation) + '>')
 
 class OperatorPipeline(VariationOperator):
+    """Chains together an arbitrary number of VariationOperators to produce a single
+    child.
 
-    pass
+    Parameters
+    ----------
+    operators : tuple or list
+        Tuple or list of variation operators to chain together in order.
+
+    """
+
+    def __init__(self, operators):
+        self.operators = operators
+
+    def produce(self, individual1, individual2, function_set):
+        """
+        Produces a child using all of the operators in the pipeline.
+
+        Parameters
+        ----------
+        individual1 : Individual
+            The first Individual whose program will be used during alternation
+            to produce a child program.
+
+        individual2 : Individual
+            The second Individual whose program will be used during alternation
+            to produce a child program.
+
+        function_set : list[]
+            List of function names (strings) to use when mutation overwrites
+            code in an individual's program with new code. This should included
+            supported function names and input_n where n is the index of a
+            feature.
+        """
+        child = individual1
+        for op in self.operators:
+            if op.operator_type == 'mutation':
+                child = op.produce(child, function_set)
+            elif op.operator_type == 'recombination':
+                child = op.produce(child, individual2)
+            elif op.operator_type == 'pipeline':
+                child = op.produce(child, individual2, function_set)
+        return child

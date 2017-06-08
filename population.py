@@ -183,8 +183,8 @@ class Individual:
         for r in X:
             out = self.run_program(r)
             if out is 'EMPTY_STACK':
-                y_hat.append(0)
-                error_vec.append(9999)
+                y_hat.append(-1e5)
+                error_vec.append(1e5)
             else:
                 y_hat.append(out)
                 error_vec.append(abs(y[row_index] - out))
